@@ -1,31 +1,70 @@
 // This file is part of www.nand2tetris.org
 // and the book "The Elements of Computing Systems"
 // by Nisan and Schocken, MIT Press.
-// File name: projects/05/Memory.hdl
+// File name: projects/05/CPU.hdl
 
 /**
- * The complete address space of the Hack computer's memory,
- * including RAM and memory-mapped I/O. 
- * The chip facilitates read and write operations, as follows:
- *     Read:  out(t) = Memory[address(t)](t)
- *     Write: if load(t-1) then Memory[address(t-1)](t) = in(t-1)
- * In words: the chip always outputs the value stored at the memory 
- * location specified by address. If load==1, the in value is loaded 
- * into the memory location specified by address. This value becomes 
- * available through the out output from the next time step onward.
- * Address space rules:
- * Only the upper 16K+8K+1 words of the Memory chip are used. 
- * Access to address>0x6000 is invalid. Access to any address in 
- * the range 0x4000-0x5FFF results in accessing the screen memory 
- * map. Access to address 0x6000 results in accessing the keyboard 
- * memory map. The behavior in these addresses is described in the 
- * Screen and Keyboard chip specifications given in the book.
+ * The Hack CPU (Central Processing unit), consisting of an ALU,
+ * two registers named A and D, and a program counter named PC.
+ * The CPU is designed to fetch and execute instructions written in 
+ * the Hack machine language. In particular, functions as follows:
+ * Executes the inputted instruction according to the Hack machine 
+ * language specification. The D and A in the language specification
+ * refer to CPU-resident registers, while M refers to the external
+ * memory location addressed by A, i.e. to Memory[A]. The inM input 
+ * holds the value of this location. If the current instruction needs 
+ * to write a value to M, the value is placed in outM, the address 
+ * of the target location is placed in the addressM output, and the 
+ * writeM control bit is asserted. (When writeM==0, any value may 
+ * appear in outM). The outM and writeM outputs are combinational: 
+ * they are affected instantaneously by the execution of the current 
+ * instruction. The addressM and pc outputs are clocked: although they 
+ * are affected by the execution of the current instruction, they commit 
+ * to their new values only in the next time step. If reset==1 then the 
+ * CPU jumps to address 0 (i.e. pc is set to 0 in next time step) rather 
+ * than to the address resulting from executing the current instruction. 
  */
 
-CHIP Memory {
-    IN in[16], load, address[15];
-    OUT out[16];
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
 
     PARTS:
     // Put your code here:
+    Mux16(a = instruction, b = ALUout, sel = instruction[15], out = inA); 
+    Not(in = instruction[15], out = isA);
+    And(a = instruction[15], b = instruction[5], out = CloadA);
+    Or(a = isA, b = CloadA, out = loadA);
+    ARegister(in = inA, load = loadA, out = outA, out[0..14] = addressM, out = pcin);
+    And(a = instruction[15], b = instruction[4], out = loadD);
+    DRegister(in = ALUout, load = loadD, out = outD);
+    And(a = instruction[15], b = instruction[3], out = writeM);
+    And(a = instruction[12], b = instruction[15], out = sel1);
+    Mux16(a = outA, b = inM, sel = sel1, out = ALUin); 
+    And(a = instruction[15], b = instruction[11], out = zx);
+    And(a = instruction[15], b = instruction[10], out = nx);
+    And(a = instruction[15], b = instruction[9], out = zy);
+    And(a = instruction[15], b = instruction[8], out = ny);
+    And(a = instruction[15], b = instruction[7], out = f);
+    And(a = instruction[15], b = instruction[6], out = no);
+    ALU(x = outD, y = ALUin, zx = zx, nx = nx, zy = zy, ny = ny, f = f, no = no, out = ALUout, out = outM, zr = zr, ng = ng);
+    And(a = ng, b = instruction[2], out = t1);  // < 0
+    And(a = zr, b = instruction[1], out = t2);  // = 0
+    Or(a = ng, b = zr, out = ngz);  
+    Not(in = ngz, out = pos);   
+    And(a = pos, b = instruction[0], out = t3);  // > 0
+    Or(a = t1, b = t2, out = tt1);             
+    Or(a = tt1, b = t3, out = tt);
+    And(a = instruction[15], b = tt, out = PCload); 
+    PC(in = pcin, load = PCload, inc = true, reset = reset, out[0..14] = pc);   
+    
 }
