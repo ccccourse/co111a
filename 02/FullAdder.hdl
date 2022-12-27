@@ -14,6 +14,7 @@ CHIP FullAdder {
 
     PARTS:
     // Put you code here:
+    //網路上找查、朋友指教
     Xor(a = a , b = b , out = xab);
     Xor(a = xab , b = c , out = sum);
     And(a = a , b = b , out = ab);
