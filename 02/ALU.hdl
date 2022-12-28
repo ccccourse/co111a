@@ -43,4 +43,38 @@ CHIP ALU {
 
     PARTS:
    // Put you code here:
+    // if (zx == 1) set x = 0        // 16-bit constant
+    Mux16(a = x, b[0..15] = false, sel = zx, out = ozx);
+
+    // if (nx == 1) set x = !x       // bitwise not
+    Not16(in = ozx, out = nnx);
+    Mux16(a = ozx, b = nnx, sel = nx, out = exx);
+
+    // if (zy == 1) set y = 0        // 16-bit constant
+    Mux16(a = y, b[0..15] = false, sel = zy, out = ozy);
+
+    // if (ny == 1) set y = !y       // bitwise not
+    Not16(in = ozy, out = nny);
+    Mux16(a = ozy, b = nny, sel = ny, out = exy);
+
+    // if (f == 1)  set out = x + y  // integer 2's complement addition
+    // if (f == 0)  set out = x & y  // bitwise and
+    Add16(a = exx, b = exy, out = xplusy);
+    And16(a = exx, b = exy, out = xandy);
+    Mux16(a = xandy, b = xplusy, sel = f, out = fxy);
+
+    // if (no == 1) set out = !out   // bitwise not
+    Not16(in = fxy, out = nfxy);
+    Mux16(a = fxy, b = nfxy, sel = no, out[0..7] = ret0, out[8..14] = ret1, out[15] = retsign, out = out);
+
+    // if (out == 0) set zr = 1
+    Or8Way(in[0..7] = ret0, out = ret0is0);
+    Or8Way(in[0..6] = ret1, in[7] = retsign, out = ret1is0);
+
+    Or(a = ret0is0, b = ret1is0, out = yzr);
+    Not(in = yzr, out = zr);
+    
+    // if (out < 0) set ng = 1
+    //And(a = retsign, b = true, out = ng);
+    Mux(a = false , b = true , sel = retsign , out = ng);
 }

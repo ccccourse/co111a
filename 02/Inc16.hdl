@@ -14,4 +14,6 @@ CHIP Inc16 {
 
     PARTS:
    // Put you code here:
+   //網路上找查、朋友指教
+   Add16(a = in, b[0] = true, out = out);
 }
